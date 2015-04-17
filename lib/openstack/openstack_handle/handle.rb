@@ -36,6 +36,11 @@ module OpenstackHandle
     end
 
     def self.raw_connect_try_ssl(username, password, address, port, service = "Compute", opts = nil)
+      if address == 'openstack.cern.ch'
+        auth_url = auth_url(address, port, 'https')
+        opts[:connection_options] = (opts[:connection_options] || {}).merge(:ssl_verify_peer => false)
+        return raw_connect(username, password, auth_url, service, opts)
+      end
       try_connection do |scheme, connection_options|
         auth_url = auth_url(address, port, scheme)
         opts[:connection_options] = (opts[:connection_options] || {}).merge(connection_options)

@@ -46,4 +46,6 @@ Vmdb::Application.configure do
   config.colorize_logging = true
 
   config.action_controller.allow_forgery_protection = true
+
+  config.force_ssl = true
 end

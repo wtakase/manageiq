@@ -1,6 +1,28 @@
 #!/usr/bin/env ruby
 # This command will automatically be run when you run "rails" with Rails 3 gems installed from the root of your application.
 
+require 'rack'
+
+module Rack
+  module Handler
+    class Thin
+      def self.run(app, options={})
+        app = Rack::Chunked.new(Rack::ContentLength.new(app))
+        server = ::Thin::Server.new(options[:Host] || '0.0.0.0',
+                                    options[:Port] || 3000,
+                                    app)
+        server.ssl = true
+        server.ssl_options = {
+          :private_key_file => '/home/miqbuilder/server.key',
+          :cert_chain_file => '/home/miqbuilder/server.crt'
+        }
+        yield server if block_given?
+        server.start
+      end
+    end
+  end
+end
+
 APP_PATH = File.expand_path('../../config/application',  __FILE__)
 require File.expand_path('../../config/boot',  __FILE__)
 require 'rails/commands'

@@ -8,10 +8,13 @@ module Metric::CiMixin::Capture::OpenstackBase
     start_time ||= end_time - 4.hours # 4 hours for symmetry with VIM
     start_time   = start_time.utc
 
+    vm = Vm.find(self.id)
+    cloud_tenant = CloudTenant.find(vm.cloud_tenant_id)
+
     $log.debug "#{log_header} start_time: #{start_time}, end_time: #{end_time}"
 
     begin
-      @perf_ems = perf_init_openstack
+      @perf_ems = perf_init_openstack(cloud_tenant.name)
       send(capture_data_method, start_time, end_time)
     rescue Exception => err
       $log.error("#{log_header} Unhandled exception during perf data collection: [#{err}], class: [#{err.class}]")
@@ -23,11 +26,11 @@ module Metric::CiMixin::Capture::OpenstackBase
     end
   end
 
-  def perf_init_openstack
+  def perf_init_openstack(tenant_name)
     raise "No EMS defined" if ext_management_system.nil?
 
     metering_service, _ = Benchmark.realtime_block(:connect) do
-      ext_management_system.connect(:service => "Metering")
+      ext_management_system.connect(:service => "Metering", :tenant_name => tenant_name)
     end
     metering_service
   end
@@ -40,7 +43,16 @@ module Metric::CiMixin::Capture::OpenstackBase
     log_header = "MIQ(#{self.class.name}.perf_collect_data_openstack_base) [#{start_time} - #{end_time}]"
     $log.debug "#{log_header} id:[#{name}] start_time: #{start_time}, end_time: #{end_time}"
 
-    counters = find_meter_counters(metric_capture_module, resource_filter, metadata_filter, log_header)
+    if self.ext_management_system.address == 'openstack.cern.ch'
+      counters = []
+      counters.push({"name" => "disk.write.bytes", :instance_filter => resource_filter})
+      counters.push({"name" => "disk.read.bytes", :instance_filter => resource_filter})
+      counters.push({"name" => "cpu_util", :instance_filter => resource_filter})
+      counters.push({"name" => "network.incoming.bytes", :instance_filter => metadata_filter})
+      counters.push({"name" => "network.outgoing.bytes", :instance_filter => metadata_filter})
+    else
+      counters = find_meter_counters(metric_capture_module, resource_filter, metadata_filter, log_header)
+    end
 
     # TODO(lsmola) we can't be sure Ceilometer will be set with this value configured. If period of collecting the
     # of the data will be bigger, we can have 'holes' in the 20s aligned data stream. So this value should be inferred
